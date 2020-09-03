@@ -44,11 +44,12 @@ parts=12
 # take duration of the first video stream
 duration=`cat data.json | jq -r '[.streams[] | select(.codec_type == "video")][0] | .duration'`
 
-# generate $parts of 1 seconde
+# generate $parts of 1 second
+# TODO: in case duration <= $parts*1: copy input file into output file directly
 rm files.txt || true
 for i in $(seq 1 $parts); do
     echo "file 'output-$i.mp4'" >> files.txt
-    start_time=`echo "($duration)/$parts*($i-1)" | bc -l`
+    start_time=`echo 'x=('$duration')/'$parts'*('$i'-1); if(x<1){"0"}; x' | bc -l`
     ffmpeg -i "$input_filepath" -an -sn -ss $start_time -t 1 -r 30 -vf scale=320:-2 -y output-$i.mp4
 done
 
