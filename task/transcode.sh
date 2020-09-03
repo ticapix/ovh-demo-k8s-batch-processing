@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -ex
+set -eux
 
 if [ $# -ne 3 ]; then
     echo "wrong argument. usage $0 <input_bucket> <file_path> <output_bucket>"
@@ -41,18 +41,22 @@ fi
 ffprobe -v quiet -hide_banner -loglevel fatal -show_streams -print_format json -i "$input_filepath" > data.json
 
 parts=12
+part_duration=1 # sec
+
 # take duration of the first video stream
 duration=`cat data.json | jq -r '[.streams[] | select(.codec_type == "video")][0] | .duration'`
 
-# generate $parts of 1 second
-# TODO: in case duration <= $parts*1: copy input file into output file directly
-rm files.txt || true
-for i in $(seq 1 $parts); do
-    echo "file 'output-$i.mp4'" >> files.txt
-    start_time=`echo 'x=('$duration')/'$parts'*('$i'-1); if(x<1){"0"}; x' | bc -l`
-    ffmpeg -i "$input_filepath" -an -sn -ss $start_time -t 1 -r 30 -vf scale=320:-2 -y output-$i.mp4
-done
-
+if [ `echo '('$duration')>('$parts'*'$part_duration')' | bc -l` -ne 0 ]; then
+    # generate $parts of $part_duration second
+    rm files.txt || true
+    for i in $(seq 1 $parts); do
+        echo "file 'output-$i.mp4'" >> files.txt
+        start_time=`echo 'x=('$duration')/'$parts'*('$i'-1); if(x<1){"0"}; x' | bc -l`
+        ffmpeg -i "$input_filepath" -an -sn -ss $start_time -t $part_duration -r 30 -vf scale=320:-2 -y output-$i.mp4
+    done
+else
+    echo "file '$input_filepath'" > files.txt
+fi
 # concatenate the parts
 ffmpeg -f concat -i files.txt -c:v libvpx-vp9 -crf 30 -b:v 0 -y output.webm
 
