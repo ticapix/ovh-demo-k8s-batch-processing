@@ -30,12 +30,12 @@ docker-test: docker-build ## docker image test
 	docker run --env-file ./vars.env $(REPO) batch_processing "$(TEST_FILE)" batch_processing_result
 
 k8s-test: docker-push ## k8s job test
-	echo "[job]" > job-template.ini
-	echo "bucket_in=batch_processing" >> job-template.ini
-	echo "filepath=$(TEST_FILE)" >> job-template.ini
-	echo "bucket_out=batch_processing_result" >> job-template.ini
-	echo "timestamp=`date +%s%N`" >> job-template.ini
-	j2 --import-env env_vars --format=ini job-template.yml.j2 job-template.ini > job.yml
+	echo "[job]" > job.ini
+	echo "bucket_in=batch_processing" >> job.ini
+	echo "filepath=$(TEST_FILE)" >> job.ini
+	echo "bucket_out=batch_processing_result" >> job.ini
+	echo "timestamp=`date +%s%N`" >> job.ini
+	j2 --import-env env_vars --format=ini job-template.yml.j2 job.ini > job.yml
 	kubectl apply -f job.yml
 
 # docker-enter-image: docker-build  ## for local manual testing
@@ -54,3 +54,5 @@ k8s-test: docker-push ## k8s job test
 	
 clean: ## remove development files
 	$(RM) ./venv3
+	$(RM) job.*
+	$(RM) vars.env
