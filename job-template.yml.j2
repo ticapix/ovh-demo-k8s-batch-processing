@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-thumb-{{ job.timestamp }}
+spec:
+  template:
+    spec:
+      containers:
+      - name: generate-thumb
+        image: ticapix/ovh-demo-k8s-batch-processing:latest
+        args: [ "{{ job.bucket_in }}", "{{ job.filepath }}", "{{ job.bucket_out }}"]
+        env:
+        {%- for var in env_vars %}
+          {%- if var.startswith('OS_') %}
+        - name: {{ var }}
+          value: "{{ env(var) }}"
+          {%- endif %}
+        {%- endfor %}
+      restartPolicy: Never
+  # backoffLimit: 1
