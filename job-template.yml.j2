@@ -2,8 +2,13 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: generate-thumb-{{ job.timestamp }}
+  labels:
+    type: batch-processing # kubectl get job -l type=batch-processing
 spec:
   template:
+    metadata:
+      labels:
+        type: batch-processing # kubectl get pod -l type=batch-processing
     spec:
       containers:
       - name: generate-thumb
@@ -17,4 +22,6 @@ spec:
           {%- endif %}
         {%- endfor %}
       restartPolicy: Never
+      nodeSelector:
+        nodepool: compute
   # backoffLimit: 1
