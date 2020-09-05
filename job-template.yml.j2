@@ -21,6 +21,11 @@ spec:
           value: "{{ env(var) }}"
           {%- endif %}
         {%- endfor %}
+        resources:
+          requests:
+            cpu: 1 # 1 core 
+          limits:
+            cpu: 8 # 8 cores
       restartPolicy: Never
       nodeSelector:
         nodepool: compute
