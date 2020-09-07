@@ -51,8 +51,9 @@ def count_unscheduled_pod(client):
         if len(pod.status.conditions) == 0:
             continue
         condition = pod.status.conditions[0]
-        if condition.type != 'PodScheduled' or  condition.reason != 'Unschedulable':
-            logger.info(condition.message)
+        if condition.type != 'PodScheduled' or condition.reason != 'Unschedulable':
+            continue
+        logger.info(condition.message)
         count += 1
     return count
 
