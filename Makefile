@@ -1,16 +1,18 @@
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-NAME=$(shell basename $(ROOT_DIR))
-REPO?=ticapix/$(NAME)
+ROOT_NAME:=$(shell basename $(ROOT_DIR))
+REPO?=ticapix/$(ROOT_NAME)
 TAG?=latest
 RM=rm -rf
 
-TEST_FILE=videos/PRIVATE 1/AVCHD/BDMV/STREAM/00103.MTS
+DOCKERFILES=$(shell find * -type f -name Dockerfile)
+BUILD_IMAGES=$(addprefix docker-build-, $(subst /,\:,$(subst /Dockerfile,,$(DOCKERFILES))))
+PUSH_IMAGES=$(addprefix docker-push-, $(subst /,\:,$(subst /Dockerfile,,$(DOCKERFILES))))
 
 .PHONY: help
 
 help:
-	@echo "$(NAME)"
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m=> %s\n", $$1, $$2}'
+	@echo "$(ROOT_NAME)"
+	@grep -hE '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m=> %s\n", $$1, $$2}'
 
 venv3: # create venv folder
 	python3 -m venv venv3
@@ -18,25 +20,18 @@ venv3: # create venv folder
 
 deps: venv3
 
-docker-build: deps ## build docker image
-	docker build -f task/Dockerfile -t $(REPO):master task
-	docker tag $(REPO):master $(REPO):$(TAG)
+$(BUILD_IMAGES):
+	$(eval image=$(subst docker-build-,,$@))
+	docker build -f $(image)/Dockerfile -t $(REPO)-$(image):master $(image)
+	docker tag $(REPO)-$(image):master $(REPO)-$(image):$(TAG)
 
-docker-push: docker-build ## push docker image to hub.docker.io
-	docker push $(REPO)
+docker-build: $(BUILD_IMAGES) ## build dockers images
 
-docker-test: docker-build ## docker image test
-	env | grep OS_ > vars.env
-	docker run --env-file ./vars.env $(REPO) batch_processing "$(TEST_FILE)" batch_processing_result
+$(PUSH_IMAGES):
+	$(eval image=$(subst docker-push-,,$@))
+	docker push $(REPO)-$(image)
 
-k8s-test: docker-push ## k8s job test
-	echo "[job]" > job.ini
-	echo "bucket_in=batch_processing" >> job.ini
-	echo "filepath=$(TEST_FILE)" >> job.ini
-	echo "bucket_out=batch_processing_result" >> job.ini
-	echo "timestamp=`date +%s%N`" >> job.ini
-	j2 --import-env env_vars --format=ini job-template.yml.j2 job.ini > job.yml
-	kubectl apply -f job.yml
+docker-push: docker-build $(PUSH_IMAGES) ## push docker images
 
 # docker-enter-image: docker-build  ## for local manual testing
 # 	docker run -it --entrypoint sh $(REPO):master
@@ -56,3 +51,6 @@ clean: ## remove development files
 	$(RM) ./venv3
 	$(RM) job.*
 	$(RM) vars.env
+
+include task/Makefile
+include monitor/Makefile
