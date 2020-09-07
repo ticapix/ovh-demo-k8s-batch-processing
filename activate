@@ -1,0 +1,6 @@
+. ./openrc.sh
+
+. ./venv3/bin/activate
+
+export KUBECONFIG=$(pwd)/kubeconfig.yml
+export LOGLEVEL=INFO
