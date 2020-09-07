@@ -20,14 +20,14 @@ venv3: # create venv folder
 
 deps: venv3
 
-$(BUILD_IMAGES):
+$(BUILD_IMAGES): deps
 	$(eval image=$(subst docker-build-,,$@))
 	docker build -f $(image)/Dockerfile -t $(REPO)-$(image):master $(image)
 	docker tag $(REPO)-$(image):master $(REPO)-$(image):$(TAG)
 
 docker-build: $(BUILD_IMAGES) ## build dockers images
 
-$(PUSH_IMAGES):
+$(PUSH_IMAGES): docker-build
 	$(eval image=$(subst docker-push-,,$@))
 	docker push $(REPO)-$(image)
 
