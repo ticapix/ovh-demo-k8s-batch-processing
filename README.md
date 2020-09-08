@@ -45,3 +45,8 @@ We'll deploy a nodepool monitoring deployment which has the following state mach
 ![autoscaling](./autoscaling-statemachine.svg)
 
 
+## Useful info
+
+- for the client calls https://docs.rs/k8s-openapi/0.9.0/k8s_openapi/api/core/v1/
+- for the api calls, use the `-v=[6-8]` on `kubectl`
+- for the api calls, use `kubectl get --raw '/apis/<kind>/<version>/<entity>' |jq .`

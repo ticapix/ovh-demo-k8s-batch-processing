@@ -11,5 +11,5 @@ k8s-test-task: docker-push-task ## test task k8s job
 	echo "filepath=$(TEST_FILE)" >> job.ini
 	echo "bucket_out=batch_processing_result" >> job.ini
 	echo "timestamp=`date +%s%N`" >> job.ini
-	shell . activate && j2 --import-env env_vars --format=ini task/job-template.yml.j2 job.ini > job.yml
-	kubectl apply -f job.yml
+	. ./activate && j2 --import-env env_vars --format=ini task/job-template.yml.j2 job.ini > job.yml
+	. ./activate && kubectl apply -f job.yml

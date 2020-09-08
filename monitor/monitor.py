@@ -9,18 +9,21 @@ from urllib3.exceptions import ReadTimeoutError
 from enum import Flag, auto
 import logging
 import kubernetes as k8s
+from collections import defaultdict
 
 
 logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.getLevelName(os.environ.get("LOGLEVEL", "INFO").upper()))
 
-MANDATORY_ENV_VARS = []
+MANDATORY_ENV_VARS = ['NODEPOOL_NAME']
+
 
 class DaemonState(Flag):
     RUNNING = auto()
     SHOULD_CLOSE = auto()
     MUST_CLOSE = auto()
+
 
 class GracefulKiller:
     state = DaemonState.RUNNING
@@ -37,12 +40,22 @@ class GracefulKiller:
         self.state = DaemonState.MUST_CLOSE
 
 
-def count_unscheduled_pod(client):
+def is_pod_assigned_to_nodepool(pod, nodepool_name):
+    if not hasattr(pod.spec, 'node_selector'):
+        return False
+    if pod.spec.node_selector is None:
+        return False
+    if 'nodepool' not in pod.spec.node_selector:
+        return False
+    if pod.spec.node_selector['nodepool'] != nodepool_name:
+        return False
+    return True
+
+
+def count_unscheduled_pod(client, nodepool_name):
     count = 0
     for pod in client.list_pod_for_all_namespaces(watch=False).items:
-        if 'type' not in pod.metadata.labels:
-            continue
-        if pod.metadata.labels['type'] != 'batch-processing':
+        if not is_pod_assigned_to_nodepool(pod, nodepool_name):
             continue
         if pod.status.phase != 'Pending':
             continue
@@ -57,6 +70,7 @@ def count_unscheduled_pod(client):
         count += 1
     return count
 
+
 def scale_nodepool(api, nodepool_name, delta=0):
     nodepool = k8sapi.get_cluster_custom_object("kube.cloud.ovh.com", "v1alpha1", "nodepools", nodepool_name)
     requested_nodes = nodepool['status']['currentNodes'] + delta
@@ -68,14 +82,29 @@ def scale_nodepool(api, nodepool_name, delta=0):
     del nodepool['status']
     nodepool['spec']['desiredNodes'] = requested_nodes
     logger.info("Scale nodepool to {}".format(requested_nodes))
-    res = api.patch_cluster_custom_object("kube.cloud.ovh.com", "v1alpha1", "nodepools", nodepool_name, nodepool)
-    print(res)
-    assert(res)
+    api.patch_cluster_custom_object("kube.cloud.ovh.com", "v1alpha1", "nodepools", nodepool_name, nodepool)
+
 
 def is_nodepool_stable(api, nodepool_name):
     # get nodepool status
-    nodepool = k8sapi.get_cluster_custom_object("kube.cloud.ovh.com", "v1alpha1", "nodepools", nodepool_name)
+    nodepool = api.get_cluster_custom_object("kube.cloud.ovh.com", "v1alpha1", "nodepools", nodepool_name)
     return nodepool['spec']['desiredNodes'] == nodepool['status']['currentNodes'] and nodepool['spec']['desiredNodes'] == nodepool['status']['availableNodes']
+
+
+def is_there_empty_node(client, nodepool_name):
+    used_nodes = defaultdict(list)
+    for pod in client.list_pod_for_all_namespaces(watch=False).items:
+        if not is_pod_assigned_to_nodepool(pod, nodepool_name):
+            continue
+        used_nodes[pod.spec.node_name].append([pod.metadata.namespace, pod.metadata.name])
+    if None in used_nodes:  # there are potentially unscheduled pods
+        return False
+    for node in client.list_node(label_selector="nodepool={}".format(nodepool_name)).items:
+        if node.metadata.name in used_nodes:
+            continue
+        logger.info("found node {} without any pod.".format(node.metadata.name))
+        return True
+    return False
 
 
 if __name__ == '__main__':
@@ -88,6 +117,9 @@ if __name__ == '__main__':
     logger.info("installing SIGINT and SIGTERM handlers")
     killer = GracefulKiller()
     logger.info("waiting to be drained ...")
+
+    nodepool_name = os.environ['NODEPOOL_NAME']
+    logger.info("monitoring nodepool {}".format(nodepool_name))
 
     # Configs can be set in Configuration class directly or using helper utility
     if 'KUBECONFIG' in os.environ:
@@ -103,17 +135,16 @@ if __name__ == '__main__':
     while killer.state == DaemonState.RUNNING:
         time.sleep(5)
         # helper: find correct params by browsing the api with kubectl get --raw '/apis/kube.cloud.ovh.com/v1alpha1/nodepools/compute' |jq .
-        unscheduled_pod = count_unscheduled_pod(k8sclient)
+        unscheduled_pod = count_unscheduled_pod(k8sclient, nodepool_name)
         if unscheduled_pod == 0:
-            # if node without pod:
-            if is_nodepool_stable(k8sapi, 'compute'):
-                scale_nodepool(k8sapi, 'compute', -1)
+            if is_there_empty_node(k8sclient, nodepool_name):
+                if is_nodepool_stable(k8sapi, nodepool_name):
+                    scale_nodepool(k8sapi, nodepool_name, -1)
         else:
             logger.debug("There are {} unscheduled pod(s)".format(unscheduled_pod))
-            if is_nodepool_stable(k8sapi, 'compute'):
-                scale_nodepool(k8sapi, 'compute', +1)
+            if is_nodepool_stable(k8sapi, nodepool_name):
+                scale_nodepool(k8sapi, nodepool_name, +1)
         # measure global activity
-        # data = k8sapi.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", label_selector="nodepool=compute")
-        # print(data)
+        # metrics = k8sapi.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", label_selector="nodepool=compute")
     # w.stop()
     logger.info("End of the program. I was killed gracefully :)")

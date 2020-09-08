@@ -6,9 +6,9 @@ metadata:
     type: batch-processing # kubectl get job -l type=batch-processing
 spec:
   template:
-    metadata:
+    {# metadata:
       labels:
-        type: batch-processing # kubectl get pod -l type=batch-processing
+        type: batch-processing # kubectl get pod -l type=batch-processing #}
     spec:
       containers:
       - name: generate-thumb
