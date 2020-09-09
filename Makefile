@@ -54,3 +54,4 @@ clean: ## remove development files
 
 include task/Makefile
 include autoscale/Makefile
+include job-controller/Makefile

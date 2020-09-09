@@ -1,19 +1,19 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: generate-thumb-{{ job.timestamp }}
+  name: generate-thumb-{{ k8s.timestamp }}
   labels:
-    type: batch-processing # kubectl get job -l type=batch-processing
+    nodepool: compute # kubectl get job -l nodepool=compute
 spec:
   template:
-    {# metadata:
+    metadata:
       labels:
-        type: batch-processing # kubectl get pod -l type=batch-processing #}
+        nodepool: compute # kubectl get pod -l nodepool=compute
     spec:
       containers:
       - name: generate-thumb
-        image: {{ job.docker_image }}
-        args: [ "{{ job.bucket_in }}", "{{ job.filepath }}", "{{ job.bucket_out }}"]
+        image: {{ k8s.docker_image }}
+        args: [ "{{ k8s.bucket_in }}", "{{ k8s.filepath }}", "{{ k8s.bucket_out }}"]
         env:
         {%- for var in env_vars %}
           {%- if var.startswith('OS_') %}

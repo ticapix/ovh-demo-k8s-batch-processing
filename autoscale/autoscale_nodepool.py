@@ -40,23 +40,9 @@ class GracefulKiller:
         self.state = DaemonState.MUST_CLOSE
 
 
-def is_pod_assigned_to_nodepool(pod, nodepool_name):
-    if not hasattr(pod.spec, 'node_selector'):
-        return False
-    if pod.spec.node_selector is None:
-        return False
-    if 'nodepool' not in pod.spec.node_selector:
-        return False
-    if pod.spec.node_selector['nodepool'] != nodepool_name:
-        return False
-    return True
-
-
 def count_unscheduled_pod(client, nodepool_name):
     count = 0
-    for pod in client.list_pod_for_all_namespaces(watch=False).items:
-        if not is_pod_assigned_to_nodepool(pod, nodepool_name):
-            continue
+    for pod in client.list_pod_for_all_namespaces(label_selector="nodepool={}".format(nodepool_name)).items:
         if pod.status.phase != 'Pending':
             continue
         if pod.status.conditions is None:
@@ -64,9 +50,9 @@ def count_unscheduled_pod(client, nodepool_name):
         if len(pod.status.conditions) == 0:
             continue
         condition = pod.status.conditions[0]
-        if condition.type != 'PodScheduled' or condition.reason != 'Unschedulable':
+        if condition.reason != 'Unschedulable':
             continue
-        logger.info(condition.message)
+        logger.info("{}.{} is pending".format(pod.metadata.name, pod.metadata.namespace))
         count += 1
     return count
 
@@ -131,10 +117,8 @@ if __name__ == '__main__':
 
     k8sclient = k8s.client.CoreV1Api()
     k8sapi = k8s.client.CustomObjectsApi()
-    # w = k8s.watch.Watch()
     while killer.state == DaemonState.RUNNING:
         time.sleep(5)
-        # helper: find correct params by browsing the api with kubectl get --raw '/apis/kube.cloud.ovh.com/v1alpha1/nodepools/compute' |jq .
         unscheduled_pod = count_unscheduled_pod(k8sclient, nodepool_name)
         if unscheduled_pod == 0:
             if is_there_empty_node(k8sclient, nodepool_name):
@@ -146,5 +130,4 @@ if __name__ == '__main__':
                 scale_nodepool(k8sapi, nodepool_name, +1)
         # measure global activity
         # metrics = k8sapi.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", label_selector="nodepool=compute")
-    # w.stop()
     logger.info("End of the program. I was killed gracefully :)")
