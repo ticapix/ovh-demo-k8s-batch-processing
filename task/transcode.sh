@@ -61,4 +61,4 @@ fi
 ffmpeg -f concat -i files.txt -c:v libvpx-vp9 -crf 30 -b:v 0 -y output.webm
 
 # upload result
-swift upload "$output_bucket" --object-name "$output_filepath" output.webm
+# swift upload "$output_bucket" --object-name "$output_filepath" output.webm

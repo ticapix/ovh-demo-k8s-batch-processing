@@ -31,7 +31,7 @@ $(PUSH_IMAGES): docker-build
 	$(eval image=$(subst docker-push-,,$@))
 	docker push $(REPO)-$(image)
 
-docker-push: docker-build $(PUSH_IMAGES) ## push docker images
+docker-push: $(PUSH_IMAGES) ## push docker images
 
 # docker-enter-image: docker-build  ## for local manual testing
 # 	docker run -it --entrypoint sh $(REPO):master

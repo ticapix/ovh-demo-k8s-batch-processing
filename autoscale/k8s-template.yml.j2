@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nodepool-autoscale
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nodepool-autoscale
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["pods", "nodes"]
+  verbs: ["list"]
+- apiGroups: ["kube.cloud.ovh.com/v1alpha1"]
+  resources: ["*"]
+  resourceNames: ["*"]
+  verbs: ["*"]
+  {# resources: ["nodepools"] #}
+  {# resourceNames: ["{{ k8s.nodepool_name }}"] #}
+  {# verbs: ["get", "patch"] #}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nodepool-autoscale
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nodepool-autoscale
+  {# name: cluster-admin #}
+subjects:
+  - kind: ServiceAccount
+    name: nodepool-autoscale
+    namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodepool-autoscale
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: nodepool-autoscale
+  template:
+    metadata:
+      labels:
+        name: nodepool-autoscale
+    spec:
+      serviceAccountName: nodepool-autoscale
+      containers:
+      - name: nodepool-autoscale
+        image: {{ k8s.docker_image }}
+        imagePullPolicy: Always # always get latest
+        env:
+          - name: LOGLEVEL
+            value: DEBUG
+          - name: NODEPOOL_NAME
+            value: {{ k8s.nodepool_name }}
+      nodeSelector: # schedule on nodes with those labels
+        nodepool: system

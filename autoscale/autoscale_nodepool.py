@@ -58,9 +58,9 @@ def count_unscheduled_pod(client, nodepool_name):
 
 
 def scale_nodepool(api, nodepool_name, delta=0):
-    nodepool = k8sapi.get_cluster_custom_object("kube.cloud.ovh.com", "v1alpha1", "nodepools", nodepool_name)
+    nodepool = api.get_cluster_custom_object("kube.cloud.ovh.com", "v1alpha1", "nodepools", nodepool_name)
     requested_nodes = nodepool['status']['currentNodes'] + delta
-    if not(requested_nodes >= nodepool['spec']['minNodes'] and requested_nodes <= nodepool['spec']['maxNodes']):
+    if not (requested_nodes >= nodepool['spec']['minNodes'] and requested_nodes <= nodepool['spec']['maxNodes']):
         logger.info("Reaching nodepool size limits {}".format(requested_nodes))
         return
     del nodepool['metadata']
@@ -79,9 +79,7 @@ def is_nodepool_stable(api, nodepool_name):
 
 def is_there_empty_node(client, nodepool_name):
     used_nodes = defaultdict(list)
-    for pod in client.list_pod_for_all_namespaces(watch=False).items:
-        if not is_pod_assigned_to_nodepool(pod, nodepool_name):
-            continue
+    for pod in client.list_pod_for_all_namespaces(label_selector="nodepool={}".format(nodepool_name)).items:
         used_nodes[pod.spec.node_name].append([pod.metadata.namespace, pod.metadata.name])
     if None in used_nodes:  # there are potentially unscheduled pods
         return False
@@ -117,6 +115,7 @@ if __name__ == '__main__':
 
     k8sclient = k8s.client.CoreV1Api()
     k8sapi = k8s.client.CustomObjectsApi()
+    scale_nodepool(k8sapi, nodepool_name, 0) # just checking service-account permission
     while killer.state == DaemonState.RUNNING:
         time.sleep(5)
         unscheduled_pod = count_unscheduled_pod(k8sclient, nodepool_name)
