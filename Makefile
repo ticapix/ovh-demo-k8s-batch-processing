@@ -53,4 +53,4 @@ clean: ## remove development files
 	$(RM) vars.env
 
 include task/Makefile
-include monitor/Makefile
+include autoscale/Makefile
