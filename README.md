@@ -38,6 +38,29 @@ spec:
   minNodes: 0
 ```
 
+and `Job` are declared with `nodeSelector` property:
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-thumb-{{ job.timestamp }}
+[...]
+spec:
+  template:
+    spec:
+      containers:
+[...]
+      nodeSelector: # schedule on nodes with those labels
+        nodepool: compute
+```
+
+### Why not using Taint & Toleration ?
+
+Because, in a controlled environment - ie with a dedicated cluster, single tenant, few `system` services - there is no need.
+
+Adding a `taint` would require - doable but means more code - to watch for new nodes in the nodepool and add the taint on the fly before anything can be scheduled on it.
+
 ### Autoscaling monitoring
 
 We'll deploy a nodepool monitoring deployment which has the following state machine
