@@ -38,21 +38,28 @@ spec:
   minNodes: 0
 ```
 
-and `Job` are declared with `nodeSelector` property:
+and `Job` are declared with `nodeSelector` property and 2 labels matching the nodepool name defined above:
 
 ```yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: generate-thumb-{{ job.timestamp }}
+  labels:
+    nodepool: compute # needed to filter Job associated to the nodepool
+spec:
+  template:
+    metadata:
+      labels:
+        nodepool: compute # needed to filter Pod associated to the nodepool
 [...]
 spec:
   template:
     spec:
       containers:
 [...]
-      nodeSelector: # schedule on nodes with those labels
-        nodepool: compute
+      nodeSelector:
+        nodepool: compute # needed to schedule Pod on the correct nodepool
 ```
 
 ### Why not using Taint & Toleration ?
