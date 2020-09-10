@@ -6,12 +6,10 @@ k8s-test-autoscale: docker-push-autoscale ## test autoscale k8s job
 	echo "[k8s]" > k8s.ini
 	echo "docker_image=$(REPO)-autoscale" >> k8s.ini
 	echo "nodepool_name=compute" >> k8s.ini
+	echo "log_level=info" >> k8s.ini
 	. ./activate && j2 --import-env env_vars --format=ini autoscale/k8s-template.yml.j2 k8s.ini > k8s-autoscale.yml
 	. ./activate && kubectl create -f k8s-autoscale.yml
 	. ./activate && kubectl auth reconcile -f k8s-autoscale.yml
-	# . ./activate && kubectl apply -f k8s.yml
-
-k8s-test-autoscale-rbac: k8s-test-autoscale
 	kubectl auth can-i --as system:serviceaccount:default:nodepool-autoscale --list
 	kubectl auth can-i --all-namespaces --as system:serviceaccount:default:nodepool-autoscale list pods
 	kubectl auth can-i --all-namespaces --as system:serviceaccount:default:nodepool-autoscale list nodes

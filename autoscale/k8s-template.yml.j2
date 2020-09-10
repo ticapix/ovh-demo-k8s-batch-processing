@@ -12,13 +12,10 @@ rules:
 - apiGroups: [""] # "" indicates the core API group
   resources: ["pods", "nodes"]
   verbs: ["list"]
-- apiGroups: ["kube.cloud.ovh.com/v1alpha1"]
-  resources: ["*"]
-  resourceNames: ["*"]
-  verbs: ["*"]
-  {# resources: ["nodepools"] #}
-  {# resourceNames: ["{{ k8s.nodepool_name }}"] #}
-  {# verbs: ["get", "patch"] #}
+- apiGroups: ["kube.cloud.ovh.com"]
+  resources: ["nodepools"]
+  resourceNames: ["{{ k8s.nodepool_name }}"]
+  verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -56,7 +53,7 @@ spec:
         imagePullPolicy: Always # always get latest
         env:
           - name: LOGLEVEL
-            value: DEBUG
+            value: {{ k8s.log_level }}
           - name: NODEPOOL_NAME
             value: {{ k8s.nodepool_name }}
       nodeSelector: # schedule on nodes with those labels
